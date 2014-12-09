@@ -100,7 +100,7 @@
           </descriptors>
           <archive>
             <manifest>
-              <mainClass>org.hammerlab.varcrunch.SomaticVarCrunch</mainClass>
+              <mainClass>org.hammerlab.varcrunch.pipelines.SomaticVarCrunch</mainClass>
             </manifest>
           </archive>
         </configuration>
