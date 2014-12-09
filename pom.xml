@@ -105,7 +105,7 @@
           </descriptors>
           <archive>
             <manifest>
-              <mainClass>org.hammerlab.varcrunch.pipelines.SomaticVarCrunch</mainClass>
+              <mainClass>org.hammerlab.varcrunch.VarCrunchDriver</mainClass>
             </manifest>
           </archive>
         </configuration>
