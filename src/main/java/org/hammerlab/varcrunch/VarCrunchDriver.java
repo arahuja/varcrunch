@@ -16,6 +16,8 @@ public class VarCrunchDriver {
             programDriver.addClass("germline", GermlineVarCrunch.class, "Standard germline variant caller");
             programDriver.addClass("somatic", SomaticVarCrunch.class, "Standard somatic variant caller, takes tumor/normal input");
 
+            programDriver.driver(args);
+
             exitCode = 0;
         } catch (Throwable e) {
             e.printStackTrace();
