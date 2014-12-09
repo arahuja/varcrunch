@@ -24,13 +24,21 @@ public class ComputeDepthInInterval extends DoFn<SAMRecordWritable, Pair<String,
         Integer startPosition = record.getAlignmentStart();
 
         if (!record.getReadUnmappedFlag() && startPosition != null) {
-            for (int i = startPosition; i < startPosition + record.getReadBases().length; ++i) {
-                emitter.emit(
-                        // emit contig, interval and record
-                        new Pair<String, Integer>(
-                                record.getReferenceName(),
-                                i % intervalSize)
-                );
+            int lastInterval = -1;
+            for (int i = startPosition; i < record.getAlignmentEnd(); i++) {
+                int nextInterval = i % intervalSize;
+                // Emit each read once for every interval it covers
+                if (nextInterval != lastInterval) {
+                    lastInterval = nextInterval;
+                    emitter.emit(
+                            // emit contig, interval and record
+                            new Pair<String, Integer>(
+                                    record.getReferenceName(),
+                                    nextInterval)
+                    );
+                    // Skip length of interval or last base
+                    i = Math.min(record.getAlignmentEnd(), i + intervalSize);
+                }
             }
         }
     }
