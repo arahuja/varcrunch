@@ -3,6 +3,7 @@ package org.hammerlab.varcrunch.mappers;
 
 import htsjdk.samtools.SAMRecord;
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.VariantContextBuilder;
 import org.apache.crunch.DoFn;
 import org.apache.crunch.Emitter;
 import org.apache.crunch.Pair;
@@ -58,7 +59,7 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
             Pileup pileup = new Pileup(currentPileupReads);
 
             if (pileup.hasVariant()) {
-                emitter.emit(new VariantContextWritable().set);
+                emitter.emit(buildVariant(currentPileupReads.peek().getReferenceName(), currentPosition, "A", "T"));
             }
 
             lociLeftToCover--;
@@ -66,7 +67,16 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
 
     }
 
-    private VariantContextWritable buildVariant() {
-        return new VariantContextWritable().set(new VariantContext());
+    private VariantContextWritable buildVariant(String contig, Integer start, String... alleles) {
+        VariantContext vc =
+                new VariantContextBuilder()
+                .start(start)
+                .chr(contig)
+                .alleles(alleles)
+                .make();
+
+        VariantContextWritable vcw = new VariantContextWritable();
+        vcw.set(vc);
+        return vcw;
     }
 }
