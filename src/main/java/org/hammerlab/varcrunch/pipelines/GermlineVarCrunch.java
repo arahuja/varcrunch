@@ -1,6 +1,5 @@
 package org.hammerlab.varcrunch.pipelines;
 
-import fi.tkk.ics.hadoop.bam.VariantContextWritable;
 import org.apache.crunch.*;
 import org.apache.crunch.impl.mr.MRPipeline;
 import org.apache.crunch.io.From;
@@ -16,10 +15,9 @@ import org.hammerlab.varcrunch.partitioning.CollectNearbyReadsDoFn;
 import org.hammerlab.varcrunch.partitioning.ComputeDepthInInterval;
 import org.seqdoop.hadoop_bam.AnySAMInputFormat;
 import org.seqdoop.hadoop_bam.SAMRecordWritable;
+import org.seqdoop.hadoop_bam.VariantContextWritable;
 
 import java.util.Map;
-
-import static org.apache.crunch.lib.SecondarySort.sortAndApply;
 
 
 public class GermlineVarCrunch extends Configured implements Tool {
@@ -69,16 +67,18 @@ public class GermlineVarCrunch extends Configured implements Tool {
                 new CollectNearbyReadsDoFn(CONTIG_INTERVAL_SIZE, contigIntervalCounts),
                 Writables.tableOf(Writables.ints(), Writables.pairs(Writables.ints(), Writables.writables(SAMRecordWritable.class))));
 
+        DoFn<Pair<Integer, Iterable<Pair<Integer, SAMRecordWritable>>>, VariantContextWritable> variantCaller =
+                new PileupGermlineVariants(CONTIG_INTERVAL_SIZE);
+
         PCollection<VariantContextWritable> variants = SecondarySort.sortAndApply(
                 partitionedReads,
-                new PileupGermlineVariants(CONTIG_INTERVAL_SIZE),
+                variantCaller,
                 Writables.writables(VariantContextWritable.class));
 
-                //pipeline.writeTextFile(contigIntervalCounts, outputPath);
+        pipeline.writeTextFile(variants, outputPath);
 
-
-                // Execute the pipeline as a MapReduce.
-                PipelineResult result = pipeline.done();
+        // Execute the pipeline as a MapReduce.
+        PipelineResult result = pipeline.done();
 
         return result.succeeded() ? 0 : 1;
     }

@@ -67,7 +67,7 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
 
     }
 
-    private VariantContextWritable buildVariant(String contig, Integer start, String... alleles) {
+    public static VariantContextWritable buildVariant(String contig, Integer start, String... alleles) {
         VariantContext vc =
                 new VariantContextBuilder()
                 .start(start)
