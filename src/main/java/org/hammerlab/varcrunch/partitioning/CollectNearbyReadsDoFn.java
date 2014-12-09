@@ -30,7 +30,7 @@ public class CollectNearbyReadsDoFn extends DoFn<SAMRecordWritable, Pair<Integer
         Integer lastTask = null;
         if (!record.getReadUnmappedFlag() && startPosition != null) {
             for (int i = startPosition; i < startPosition + record.getReadBases().length; ++i) {
-                Integer nextTask = i % intervalSize;
+                Integer nextTask = i / intervalSize;
                 if (nextTask != lastTask) {
                     lastTask = nextTask;
                     emitter.emit(

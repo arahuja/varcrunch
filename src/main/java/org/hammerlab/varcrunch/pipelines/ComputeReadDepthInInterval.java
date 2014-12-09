@@ -6,19 +6,15 @@ import org.apache.crunch.io.From;
 import org.apache.crunch.types.writable.Writables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.hammerlab.varcrunch.filters.MappedReadFilter;
-import org.hammerlab.varcrunch.filters.UnmappedReadFilter;
 import org.hammerlab.varcrunch.partitioning.ComputeDepthInInterval;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.seqdoop.hadoop_bam.AnySAMInputFormat;
 import org.seqdoop.hadoop_bam.SAMRecordWritable;
-
-import java.util.Map;
 
 
 public class ComputeReadDepthInInterval extends Configured implements Tool {
