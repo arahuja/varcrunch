@@ -77,6 +77,11 @@
       <artifactId>hadoop-bam</artifactId>
       <version>6.1-SNAPSHOT</version>
     </dependency>
+    <dependency>
+      <groupId>args4j</groupId>
+      <artifactId>args4j</artifactId>
+      <version>[2.0.29,)</version>
+    </dependency>
   </dependencies>
 
   <build>
