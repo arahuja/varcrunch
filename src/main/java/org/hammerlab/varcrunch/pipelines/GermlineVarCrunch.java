@@ -6,9 +6,6 @@ import org.apache.crunch.io.From;
 import org.apache.crunch.lib.SecondarySort;
 import org.apache.crunch.types.writable.Writables;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.util.GenericOptionsParser;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.hammerlab.varcrunch.mappers.PileupGermlineVariants;
 import org.hammerlab.varcrunch.partitioning.CollectNearbyReadsDoFn;
@@ -17,10 +14,11 @@ import org.seqdoop.hadoop_bam.AnySAMInputFormat;
 import org.seqdoop.hadoop_bam.SAMRecordWritable;
 import org.seqdoop.hadoop_bam.VariantContextWritable;
 
+import java.util.HashMap;
 import java.util.Map;
 
 
-public class GermlineVarCrunch extends Configured implements Tool {
+public class GermlineVarCrunch extends VarCrunchTool {
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new Configuration(), new GermlineVarCrunch(), args);
@@ -30,16 +28,7 @@ public class GermlineVarCrunch extends Configured implements Tool {
 
     public int run(String[] args) throws Exception {
 
-        if (args.length != 3) {
-            System.err.println("Usage: yarn jar varcrunch-*-SNAPSHOT-job.jar"
-                                      + " [generic options] input output");
-            System.err.println();
-            GenericOptionsParser.printGenericCommandUsage(System.err);
-            return 1;
-        }
-
-        String readsInputPath = args[0];
-        String outputPath = args[1];
+        super.parseArguments(args);
 
         // Create an object to coordinate pipeline creation and execution.
         Pipeline pipeline = new MRPipeline(GermlineVarCrunch.class, getConf());
@@ -47,7 +36,7 @@ public class GermlineVarCrunch extends Configured implements Tool {
 
         // Set up source to read from BAMs/SAMs
         TableSource<Long, SAMRecordWritable> readsInputSource = From.formattedFile(
-                readsInputPath,
+                inputPath,
                 AnySAMInputFormat.class,
                 Writables.longs(),
                 Writables.writables(SAMRecordWritable.class));
@@ -62,12 +51,17 @@ public class GermlineVarCrunch extends Configured implements Tool {
         // Compute read depth distribution
         Map<Pair<String, Integer>, Long> contigIntervalCounts = contigIntervals.count().asMap().getValue();
 
-        // Flatmap reads to task
-        PTable<Integer, Pair<Integer, SAMRecordWritable>> partitionedReads = reads.parallelDo(
-                new CollectNearbyReadsDoFn(CONTIG_INTERVAL_SIZE, contigIntervalCounts),
-                Writables.tableOf(Writables.ints(), Writables.pairs(Writables.ints(), Writables.writables(SAMRecordWritable.class))));
+        // Need to coalesce regions into evenly sized partitions
+        Map<Pair<String, Integer>, Long> contigIntervalTasks = new HashMap<Pair<String, Integer>, Long>();
 
-        DoFn<Pair<Integer, Iterable<Pair<Integer, SAMRecordWritable>>>, VariantContextWritable> variantCaller =
+        // Flatmap reads to task
+        // For now this is just distributes evenly across CONTIG_INTERVAL_SIZE splits
+        PTable<Long, Pair<Integer, SAMRecordWritable>> partitionedReads = reads.parallelDo(
+                "MapReadsToTask",
+                new CollectNearbyReadsDoFn(CONTIG_INTERVAL_SIZE, contigIntervalTasks),
+                Writables.tableOf(Writables.longs(), Writables.pairs(Writables.ints(), Writables.writables(SAMRecordWritable.class))));
+
+        DoFn<Pair<Long, Iterable<Pair<Integer, SAMRecordWritable>>>, VariantContextWritable> variantCaller =
                 new PileupGermlineVariants(CONTIG_INTERVAL_SIZE);
 
         PCollection<VariantContextWritable> variants = SecondarySort.sortAndApply(

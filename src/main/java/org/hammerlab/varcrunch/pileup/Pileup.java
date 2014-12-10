@@ -3,22 +3,29 @@ package org.hammerlab.varcrunch.pileup;
 import htsjdk.samtools.SAMRecord;
 
 import java.util.Deque;
-import java.util.List;
 
 public class Pileup {
 
     private Deque<SAMRecord> reads;
+    private Long currentPosition;
 
-    public Pileup(Deque<SAMRecord> reads) {
+    public Pileup(Long currentPosition, Deque<SAMRecord> reads) {
+        this.currentPosition =  currentPosition;
         this.reads = reads;
     }
 
     public int depth() {
+
         return reads.size();
     }
 
     public boolean hasVariant() {
-        return false;
+       // Call variants randomly
+        if (currentPosition % 100000 == 0){
+            return true;
+        } else {
+            return false;
+        }
     }
 
 //    public int numMismatches() {

@@ -5,28 +5,18 @@ import org.apache.crunch.impl.mr.MRPipeline;
 import org.apache.crunch.io.From;
 import org.apache.crunch.types.writable.Writables;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 import org.hammerlab.varcrunch.filters.MappedReadFilter;
 import org.hammerlab.varcrunch.partitioning.ComputeDepthInInterval;
-import org.kohsuke.args4j.CmdLineException;
-import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.seqdoop.hadoop_bam.AnySAMInputFormat;
 import org.seqdoop.hadoop_bam.SAMRecordWritable;
 
 
-public class ComputeReadDepthInInterval extends Configured implements Tool {
+public class ComputeReadDepthInInterval extends VarCrunchTool {
 
     @Option(name = "--interval-length", aliases = { "-l" })
     private int intervalLength = 100000;
-
-    @Option(name = "--input", aliases = { "-i" }, required = true)
-    private String inputPath;
-
-    @Option(name = "--output", aliases = { "-o" }, required = true)
-    private String outputPath;
 
     public static void main(String[] args) throws Exception {
         ToolRunner.run(new Configuration(), new ComputeReadDepthInInterval(), args);
@@ -34,14 +24,7 @@ public class ComputeReadDepthInInterval extends Configured implements Tool {
 
     public int run(String[] args) throws Exception {
 
-        CmdLineParser parser = new CmdLineParser(this);
-        try {
-            parser.parseArgument(args);
-        } catch (CmdLineException e) {
-            System.err.println(e.getMessage());
-            parser.printUsage(System.out);
-            System.exit(-1);
-        }
+        super.parseArguments(args);
 
         // Create an object to coordinate pipeline creation and execution.
         Pipeline pipeline = new MRPipeline(ComputeReadDepthInInterval.class, getConf());
@@ -60,6 +43,7 @@ public class ComputeReadDepthInInterval extends Configured implements Tool {
         PCollection<SAMRecordWritable> mappedReads = records.filter(new MappedReadFilter());
 
         PCollection<Pair<String, Integer>> contigIntervals = mappedReads.parallelDo(
+                "ComputeDepthInInterval",
                 new ComputeDepthInInterval(intervalLength),
                 Writables.pairs(Writables.strings(), Writables.ints()));
 

@@ -9,7 +9,7 @@ import org.seqdoop.hadoop_bam.SAMRecordWritable;
 import java.util.Map;
 
 
-public class CollectNearbyReadsDoFn extends DoFn<SAMRecordWritable, Pair<Integer,  Pair<Integer, SAMRecordWritable>>> {
+public class CollectNearbyReadsDoFn extends DoFn<SAMRecordWritable, Pair<Long,  Pair<Integer, SAMRecordWritable>>> {
 
 
     private final Map<Pair<String, Integer>, Long> positionToTaskMapping;
@@ -21,26 +21,33 @@ public class CollectNearbyReadsDoFn extends DoFn<SAMRecordWritable, Pair<Integer
     }
 
     @Override
-    public void process (SAMRecordWritable input, Emitter <Pair<Integer, Pair<Integer, SAMRecordWritable>>> emitter) {
+    public void process (SAMRecordWritable input, Emitter <Pair<Long, Pair<Integer, SAMRecordWritable>>> emitter) {
         // emit each position this read overlaps
 
         SAMRecord record = input.get();
         Integer startPosition = record.getAlignmentStart();
 
-        Integer lastTask = null;
+        Long lastTask = null;
         if (!record.getReadUnmappedFlag() && startPosition != null) {
             for (int i = startPosition; i < startPosition + record.getReadBases().length; ++i) {
-                Integer nextTask = i / intervalSize;
+                Long nextTask = positionToTaskMapping.get(new Pair<String, Integer>(record.getReferenceName(), i));
+
+                // If we haven't mapped this position to a task, do so evenly
+                if (nextTask == null) {
+                    nextTask = record.getReferenceName().hashCode() + (long) (i / intervalSize);
+                }
+
                 if (nextTask != lastTask) {
                     lastTask = nextTask;
                     emitter.emit(
                             // emit contig, interval and record
-                            new Pair<Integer, Pair<Integer, SAMRecordWritable>>(
+                            new Pair<Long, Pair<Integer, SAMRecordWritable>>(
                                     lastTask,
                                     new Pair(input.get().getAlignmentStart(), input)
                     ));
                 }
-
+                // Skip length of interval or to the last base
+                i = Math.min(record.getAlignmentEnd(), i + intervalSize);
             }
         }
     }

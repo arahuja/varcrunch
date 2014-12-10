@@ -2,8 +2,7 @@ package org.hammerlab.varcrunch.mappers;
 
 
 import htsjdk.samtools.SAMRecord;
-import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.variantcontext.VariantContextBuilder;
+import htsjdk.variant.variantcontext.*;
 import org.apache.crunch.DoFn;
 import org.apache.crunch.Emitter;
 import org.apache.crunch.Pair;
@@ -12,10 +11,11 @@ import org.seqdoop.hadoop_bam.SAMRecordWritable;
 import org.seqdoop.hadoop_bam.VariantContextWritable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
 
-public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Integer, SAMRecordWritable>>>, VariantContextWritable> {
+public class PileupGermlineVariants extends DoFn<Pair<Long, Iterable<Pair<Integer, SAMRecordWritable>>>, VariantContextWritable> {
 
     Integer lociToCover;
 
@@ -24,8 +24,8 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
     }
 
     @Override
-    public void process(Pair<Integer, Iterable<Pair<Integer, SAMRecordWritable>>> input, Emitter<VariantContextWritable> emitter) {
-        Integer task = input.first();
+    public void process(Pair<Long, Iterable<Pair<Integer, SAMRecordWritable>>> input, Emitter<VariantContextWritable> emitter) {
+        Long task = input.first();
         Iterator<Pair<Integer, SAMRecordWritable>> positionAndReads = input.second().iterator();
 
         Deque<SAMRecord> currentPileupReads = new ArrayDeque<SAMRecord>();
@@ -35,7 +35,7 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
         while (lociLeftToCover > 0) {
 
             Integer currentLociOffset = lociToCover - lociLeftToCover;
-            Integer currentPosition = task * lociLeftToCover + currentLociOffset;
+            Long currentPosition = task * lociLeftToCover + currentLociOffset;
 
             // Remove reads from pileup that are before the current position
             while( currentPileupReads.peekFirst().getAlignmentEnd() < currentPosition) {
@@ -56,10 +56,16 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
             }
 
             // process pileup
-            Pileup pileup = new Pileup(currentPileupReads);
+            Pileup pileup = new Pileup(currentPosition, currentPileupReads);
 
             if (pileup.hasVariant()) {
-                emitter.emit(buildVariant(currentPileupReads.peek().getReferenceName(), currentPosition, "A", "T"));
+                emitter.emit(buildVariant(
+                        currentPileupReads.peek().getReferenceName(),
+                        currentPosition,
+                        pileup.depth()
+                        , "A",
+                        "T")
+                );
             }
 
             lociLeftToCover--;
@@ -67,12 +73,14 @@ public class PileupGermlineVariants extends DoFn<Pair<Integer, Iterable<Pair<Int
 
     }
 
-    public static VariantContextWritable buildVariant(String contig, Integer start, String... alleles) {
+    public static VariantContextWritable buildVariant(String contig, Long start, Integer depth, String... alleles) {
+        Genotype gt = new GenotypeBuilder().DP(depth).make();
         VariantContext vc =
                 new VariantContextBuilder()
                 .start(start)
                 .chr(contig)
                 .alleles(alleles)
+                .genotypes(gt)
                 .make();
 
         VariantContextWritable vcw = new VariantContextWritable();
