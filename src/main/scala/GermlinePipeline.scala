@@ -9,18 +9,18 @@ import org.hammerlab.guacamole.pileup.Pileup
 import org.hammerlab.guacamole.reads.{MappedRead, Read}
 import org.hammerlab.guacamole.variants.AlleleConversions
 import org.hammerlab.guacamole.windowing.SlidingWindow
+import org.hammerlab.varcrunch.VarCrunchArgs
+import org.hammerlab.varcrunch.pipelines.VarCrunchTool
 import org.seqdoop.hadoop_bam.{AnySAMInputFormat, SAMRecordWritable}
 
 import scala.collection.mutable.ArrayBuffer
 
-object GermlinePipeline extends PipelineApp {
+object GermlinePipeline extends VarCrunchArgs with PipelineApp {
 
   type GenomicPosition = (String, Int)
 
   override def run(args: Array[String]): Unit = {
-
-    val inputPath = args(0)
-    val outputPath = args(1)
+    super.parseArguments(args)
 
     val reads: PCollection[SAMRecordWritable] = read(from.formattedFile(
       inputPath,
@@ -63,7 +63,9 @@ object GermlinePipeline extends PipelineApp {
   def callVariants(task: Int, readsAndPositions: Iterable[(Int, SAMRecordWritable)]): Seq[Genotype] = {
 
     val readsAndPositionsIterator = readsAndPositions.iterator
-    val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap(kv => Read.fromSAMRecordOpt(kv._2.get(), 0).flatMap(_.getMappedReadOpt))
+    val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap(kv =>
+      Read.fromSAMRecordOpt(kv._2.get(), 0).flatMap(_.getMappedReadOpt)
+    )
     val window = SlidingWindow(0L, reads)
     var nextLocus = window.nextLocusWithRegions()
 
@@ -71,10 +73,12 @@ object GermlinePipeline extends PipelineApp {
 
     while (nextLocus.isDefined) {
       window.setCurrentLocus(nextLocus.get)
-      val pileup = Pileup(window.currentRegions(), nextLocus.get)
-      val calledAlleles = GermlineStandard.Caller.callVariantsAtLocus(pileup)
 
-      genotypes ++= calledAlleles.flatMap(AlleleConversions.calledAlleleToADAMGenotype(_))
+      if (!window.currentRegions().isEmpty) {
+        val pileup = Pileup(window.currentRegions(), nextLocus.get)
+        val calledAlleles = GermlineStandard.Caller.callVariantsAtLocus(pileup)
+        genotypes ++= calledAlleles.flatMap(AlleleConversions.calledAlleleToADAMGenotype(_))
+      }
 
       nextLocus = window.nextLocusWithRegions()
     }
