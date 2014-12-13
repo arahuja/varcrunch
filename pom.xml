@@ -9,6 +9,8 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <scala.version>2.10.3</scala.version>
+    <scala.version.prefix>2.10</scala.version.prefix>
   </properties>
 
   <dependencies>
@@ -59,43 +61,10 @@
         </exclusion>
       </exclusions>
     </dependency>
-
-    <dependency>
-      <groupId>org.seqdoop</groupId>
-      <artifactId>htsjdk</artifactId>
-      <version>1.118</version>
-    </dependency>
-    <dependency>
-      <groupId>org.seqdoop</groupId>
-      <artifactId>hadoop-bam</artifactId>
-      <version>7.0.0</version>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <version>1.9.0</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.10</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>fi.tkk.ics.hadoop.bam</groupId>
-      <artifactId>hadoop-bam</artifactId>
-      <version>6.1-SNAPSHOT</version>
-    </dependency>
     <dependency>
       <groupId>args4j</groupId>
       <artifactId>args4j</artifactId>
       <version>[2.0.29,)</version>
-    </dependency>
-    <dependency>
-      <groupId>org.bdgenomics.adam</groupId>
-      <artifactId>adam-core</artifactId>
-      <version>0.15.0</version>
     </dependency>
     <dependency>
       <groupId>org.hammerlab.guacamole</groupId>
@@ -103,9 +72,10 @@
       <version>0.0.1</version>
     </dependency>
     <dependency>
-      <groupId>com.example</groupId>
-      <artifactId>scrunch-demo</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.version.prefix}</artifactId>
+      <version>2.2.1</version>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -149,7 +119,7 @@
             </goals>
           </execution>
           <execution>
-            <id>scala-test-compile</id>
+            <id>scala-test-compile-first</id>
             <phase>process-test-resources</phase>
             <goals>
               <goal>testCompile</goal>
@@ -174,11 +144,34 @@
           </execution>
         </executions>
       </plugin>
+      <!-- disable surefire -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.7</version>
+        <configuration>
+          <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+      <!-- enable scalatest -->
+      <plugin>
+        <groupId>org.scalatest</groupId>
+        <artifactId>scalatest-maven-plugin</artifactId>
+        <version>1.0</version>
+        <configuration>
+          <junitxml>.</junitxml>
+          <argLine>-Xmx2048m</argLine>
+        </configuration>
+        <executions>
+          <execution>
+            <id>test</id>
+            <goals>
+              <goal>test</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
-
-  <prerequisites>
-    <maven>2.2.1</maven>
-  </prerequisites>
 
 </project>

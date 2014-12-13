@@ -7,10 +7,14 @@ import org.seqdoop.hadoop_bam.SAMRecordWritable;
 public class MappedReadFilter extends FilterFn<SAMRecordWritable> {
     @Override
     public boolean accept(SAMRecordWritable input) {
-        return (input.get().getMappingQuality() != SAMRecord.UNKNOWN_MAPPING_QUALITY &&
-                input.get().getReferenceName() != null &&
-                input.get().getReferenceIndex() >= SAMRecord.NO_ALIGNMENT_REFERENCE_INDEX &&
-                input.get().getAlignmentStart() >= 0 &&
-                input.get().getUnclippedStart() >= 0);
+        return isMapped(input.get());
+    }
+
+    public static boolean isMapped(SAMRecord input) {
+        return (input.getMappingQuality() != SAMRecord.UNKNOWN_MAPPING_QUALITY &&
+                input.getReferenceName() != null &&
+                input.getReferenceIndex() >= SAMRecord.NO_ALIGNMENT_REFERENCE_INDEX &&
+                input.getAlignmentStart() >= 0 &&
+                input.getUnclippedStart() >= 0);
     }
 }

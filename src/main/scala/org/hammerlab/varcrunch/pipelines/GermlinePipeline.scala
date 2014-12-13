@@ -1,7 +1,8 @@
-package org.hammerlab.pipeline
+package org.hammerlab.varcrunch.pipelines
 
 import htsjdk.samtools.SAMRecord
-import org.apache.crunch.scrunch.{PCollection, PipelineApp, Writables}
+import org.apache.crunch.scrunch.{PCollection, PipelineApp}
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.LongWritable
 import org.bdgenomics.formats.avro.Genotype
 import org.hammerlab.guacamole.commands.GermlineStandard
@@ -10,7 +11,8 @@ import org.hammerlab.guacamole.reads.{MappedRead, Read}
 import org.hammerlab.guacamole.variants.AlleleConversions
 import org.hammerlab.guacamole.windowing.SlidingWindow
 import org.hammerlab.varcrunch.VarCrunchArgs
-import org.hammerlab.varcrunch.pipelines.VarCrunchTool
+import org.hammerlab.varcrunch.filters.MappedReadFilter
+import org.seqdoop.hadoop_bam.util.SAMHeaderReader
 import org.seqdoop.hadoop_bam.{AnySAMInputFormat, SAMRecordWritable}
 
 import scala.collection.mutable.ArrayBuffer
@@ -22,6 +24,9 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
   override def run(args: Array[String]): Unit = {
     super.parseArguments(args)
 
+    val samHeader = SAMHeaderReader.readSAMHeaderFrom(new Path(inputPath), configuration)
+
+
     val reads: PCollection[SAMRecordWritable] = read(from.formattedFile(
       inputPath,
       classOf[AnySAMInputFormat],
@@ -31,40 +36,44 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
 
     // Filter to mapped reads
     val mappedReads = reads.filter(r => {
-      val read: SAMRecord = r.get()
-      !read.getReadUnmappedFlag()
+      MappedReadFilter.isMapped(r.get())
     })
 
     // Compute depth in interval
-    val readsInIntervals: PCollection[(String, Int)] = mappedReads.flatMap(r => {
-      val intervalSize = 100000
-      val read: SAMRecord = r.get()
-      val overlappingIntervals = (read.getAlignmentStart until read.getAlignmentEnd).map( _ / intervalSize).toSet
+//    val readsInIntervals: PCollection[(String, Int)] = mappedReads.flatMap(r => {
+//      val intervalSize = 100000
+//      val read: SAMRecord = r.get()
+//      val overlappingIntervals = (read.getAlignmentStart until read.getAlignmentEnd).map( _ / intervalSize).toSet
+//
+//      overlappingIntervals.map(pos => (read.getReferenceName, pos))
+//    }, Writables.tuple2(Writables.strings, Writables.ints))
+//
+//    val intervalCounts = readsInIntervals.count()
 
-      overlappingIntervals.map(pos => (read.getReferenceName, pos))
-    }, Writables.tuple2(Writables.strings, Writables.ints))
+    val genotypes = callVariants(mappedReads)
 
-    val intervalCounts = readsInIntervals.count()
+    write(genotypes, to.avroFile(outputPath))
 
-    // Partition reads to overlapping intervals, duplicate reads if they overlap many intervals
-    val readsPartitioned = mappedReads.flatMap(r => {
+  }
+
+  def callVariants(reads: PCollection[SAMRecordWritable]): PCollection[Genotype] = {
+    val readsPartitioned = reads.flatMap(r => {
       val intervalSize = 100000
       val read: SAMRecord = r.get()
       val overlappingIntervals = (read.getAlignmentStart until read.getAlignmentEnd).map( _ / intervalSize).toSet
       overlappingIntervals.map( (_, (read.getAlignmentStart, r)) )
     })
 
-    val genotypes = readsPartitioned.secondarySortAndFlatMap(callVariants)
-
-    write(genotypes, to.avroFile(outputPath))
+    readsPartitioned.secondarySortAndFlatMap(callVariantsOnPartition)
 
   }
 
-  def callVariants(task: Int, readsAndPositions: Iterable[(Int, SAMRecordWritable)]): Seq[Genotype] = {
+  def callVariantsOnPartition(task: Int, readsAndPositions: Iterable[(Int, SAMRecordWritable)]): Seq[Genotype] = {
 
     val readsAndPositionsIterator = readsAndPositions.iterator
-    val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap(kv =>
-      Read.fromSAMRecordOpt(kv._2.get(), 0).flatMap(_.getMappedReadOpt)
+    val samRecords: Iterator[SAMRecord] = readsAndPositionsIterator.map(_._2.get())
+    val reads: Iterator[MappedRead] = samRecords.flatMap(
+      Read.fromSAMRecordOpt(_, 0).flatMap(_.getMappedReadOpt)
     )
     val window = SlidingWindow(0L, reads)
     var nextLocus = window.nextLocusWithRegions()
@@ -73,7 +82,6 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
 
     while (nextLocus.isDefined) {
       window.setCurrentLocus(nextLocus.get)
-
       if (!window.currentRegions().isEmpty) {
         val pileup = Pileup(window.currentRegions(), nextLocus.get)
         val calledAlleles = GermlineStandard.Caller.callVariantsAtLocus(pileup)
