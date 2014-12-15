@@ -1,6 +1,6 @@
 package org.hammerlab.varcrunch.read
 
-import org.apache.crunch.scrunch.{From, PCollection, Pipeline}
+import org.apache.crunch.scrunch.{PTable, From, PCollection, Pipeline}
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.LongWritable
 import org.bdgenomics.adam.converters.SAMRecordConverter
@@ -35,6 +35,16 @@ object Reads {
       classOf[LongWritable],
       classOf[SAMRecordWritable]
     )).values.map(r => converter.convert(r.get, seqDict, readGroups))
+  }
+
+  def partitionReadsByRegion(reads: PCollection[AlignmentRecord],
+                             intervalLength: Int): PTable[Int, (Long, AlignmentRecord)] = {
+    reads.flatMap(r => {
+      val overlappingIntervals =
+        Range.Long.
+          inclusive(r.getStart, r.getEnd - 1, 1).map( _ / intervalLength ).toSet
+      overlappingIntervals.map(task => (task.toInt, (r.getStart.toLong, r)))
+    })
   }
 
 }
