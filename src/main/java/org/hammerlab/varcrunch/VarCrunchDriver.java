@@ -1,6 +1,7 @@
 package org.hammerlab.varcrunch;
 
 import org.apache.hadoop.util.ProgramDriver;
+
 import org.hammerlab.varcrunch.pipelines.ComputeReadDepthInInterval;
 import org.hammerlab.varcrunch.pipelines.GermlinePipeline;
 import org.hammerlab.varcrunch.pipelines.SomaticVarCrunch;
@@ -13,6 +14,7 @@ public class VarCrunchDriver {
         int exitCode = -1;
         try {
             programDriver.addClass("readdepth", ComputeReadDepthInInterval.class, "Computes read depth over a given size interval");
+
             programDriver.addClass("germline", GermlinePipeline.class, "Standard germline variant caller");
             programDriver.addClass("somatic", SomaticVarCrunch.class, "Standard somatic variant caller, takes tumor/normal input");
 
