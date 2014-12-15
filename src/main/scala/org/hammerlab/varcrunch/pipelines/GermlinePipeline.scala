@@ -58,7 +58,7 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
   def callVariantsOnPartition(task: Int, readsAndPositions: Iterable[(Long, AlignmentRecord)]): Seq[Genotype] = {
 
     val readsAndPositionsIterator = readsAndPositions.iterator
-    val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap( kv =>  Read.fromADAMRecord(kv._2).getMappedReadOpt)
+    val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap( kv =>  Read.fromADAMRecord(kv._2, token = 0).getMappedReadOpt)
     val window = SlidingWindow(0L, reads)
     var nextLocus = window.nextLocusWithRegions()
 
