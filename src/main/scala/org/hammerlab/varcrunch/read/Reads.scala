@@ -11,6 +11,8 @@ import org.seqdoop.hadoop_bam.{AnySAMInputFormat, SAMRecordWritable}
 
 
 object Reads {
+  type GenomicPosition = (String, Long)
+
 
   def loadReads(pipeline: Pipeline, inputPath: String): PCollection[SAMRecordWritable] = {
     pipeline.read(From.formattedFile(
@@ -22,7 +24,6 @@ object Reads {
   }
 
   def loadBDGReads(pipeline: Pipeline, inputPath: String): PCollection[AlignmentRecord] = {
-
 
     val samHeader = SAMHeaderReader.readSAMHeaderFrom(new Path(inputPath), pipeline.getConfiguration())
     val seqDict = SequenceDictionary(samHeader)
@@ -38,12 +39,14 @@ object Reads {
   }
 
   def partitionReadsByRegion(reads: PCollection[AlignmentRecord],
-                             intervalLength: Int): PTable[Int, (Long, AlignmentRecord)] = {
+                             intervalLength: Int): PTable[GenomicPosition, (Long, AlignmentRecord)] = {
+
     reads.flatMap(r => {
+      val contigName = r.getContig.getContigName
       val overlappingIntervals =
         Range.Long.
           inclusive(r.getStart, r.getEnd - 1, 1).map( _ / intervalLength ).toSet
-      overlappingIntervals.map(task => (task.toInt, (r.getStart.toLong, r)))
+      overlappingIntervals.map(interval => ((contigName, interval), (r.getStart.toLong, r)))
     })
   }
 

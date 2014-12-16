@@ -9,11 +9,13 @@ import org.hammerlab.guacamole.variants.AlleleConversions
 import org.hammerlab.guacamole.windowing.SlidingWindow
 import org.hammerlab.varcrunch.VarCrunchArgs
 import org.hammerlab.varcrunch.read.Reads
+import org.hammerlab.varcrunch.read.Reads.GenomicPosition
 import org.kohsuke.args4j.{Option => Opt}
 
 import scala.collection.mutable.ArrayBuffer
 
 object GermlinePipeline extends VarCrunchArgs with PipelineApp {
+
 
   @Opt(name = "--intervalLength", aliases = Array("-l"))
   protected var intervalLength: Int = 100000
@@ -43,27 +45,21 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
 
   }
 
-  def callVariants(reads: PCollection[AlignmentRecord]): PCollection[Genotype] = {
-    val readsPartitioned: PTable[Int, (Long, AlignmentRecord)] = reads.flatMap(r => {
-      val overlappingIntervals =
-        Range.Long.
-          inclusive(r.getStart, r.getEnd - 1, 1).map( _ / intervalLength ).toSet
-      overlappingIntervals.map(task => (task.toInt, (r.getStart.toLong, r)))
-    })
 
+  def callVariants(reads: PCollection[AlignmentRecord]): PCollection[Genotype] = {
+    val readsPartitioned: PTable[GenomicPosition, (Long, AlignmentRecord)] = Reads.partitionReadsByRegion(reads, intervalLength)
     readsPartitioned.secondarySortAndFlatMap(callVariantsOnPartition)
 
   }
 
-  def callVariantsOnPartition(task: Int, readsAndPositions: Iterable[(Long, AlignmentRecord)]): Seq[Genotype] = {
+  def callVariantsOnPartition(task: GenomicPosition, readsAndPositions: Iterable[(Long, AlignmentRecord)]): Seq[Genotype] = {
 
     val readsAndPositionsIterator = readsAndPositions.iterator
     val reads: Iterator[MappedRead] = readsAndPositionsIterator.flatMap( kv =>  Read.fromADAMRecord(kv._2, token = 0).getMappedReadOpt)
-    val window = SlidingWindow(0L, reads)
-    var nextLocus = window.nextLocusWithRegions()
-
     val genotypes = new ArrayBuffer[Genotype]()
 
+    val window = SlidingWindow(0L, reads)
+    var nextLocus = window.nextLocusWithRegions()
     while (nextLocus.isDefined) {
       window.setCurrentLocus(nextLocus.get)
       if (!window.currentRegions().isEmpty) {
@@ -73,6 +69,7 @@ object GermlinePipeline extends VarCrunchArgs with PipelineApp {
       }
       nextLocus = window.nextLocusWithRegions()
     }
+
     genotypes
   }
 }

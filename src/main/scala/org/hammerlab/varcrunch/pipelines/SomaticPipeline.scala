@@ -10,6 +10,7 @@ import org.hammerlab.guacamole.variants.AlleleConversions
 import org.hammerlab.guacamole.windowing.SlidingWindow
 import org.hammerlab.varcrunch.VarCrunchSomaticArgs
 import org.hammerlab.varcrunch.read.Reads
+import org.hammerlab.varcrunch.read.Reads.GenomicPosition
 import org.kohsuke.args4j.{Option => Opt}
 
 import scala.collection.mutable.ArrayBuffer
@@ -59,7 +60,6 @@ object SomaticPipeline extends VarCrunchSomaticArgs with PipelineApp {
       read
     })
 
-
     val tumorReadsPartitioned = Reads.partitionReadsByRegion(labeledTumorReads, intervalLength)
     val normalReadsPartitioned = Reads.partitionReadsByRegion(labeledNormalReads, intervalLength)
 
@@ -67,7 +67,7 @@ object SomaticPipeline extends VarCrunchSomaticArgs with PipelineApp {
     groupedReads.secondarySortAndFlatMap(callSomaticVariantsOnPartition)
   }
 
-  def callSomaticVariantsOnPartition(task: Int, readsAndPositions: Iterable[(Long, AlignmentRecord)]): Seq[Genotype] = {
+  def callSomaticVariantsOnPartition(task: GenomicPosition, readsAndPositions: Iterable[(Long, AlignmentRecord)]) = {
 
     val readsAndPositionsIterator = readsAndPositions.iterator
     val reads: Iterator[MappedRead] =
