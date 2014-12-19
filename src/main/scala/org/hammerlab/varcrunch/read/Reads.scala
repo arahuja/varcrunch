@@ -13,7 +13,6 @@ import org.seqdoop.hadoop_bam.{AnySAMInputFormat, SAMRecordWritable}
 object Reads {
   type GenomicPosition = (String, Long)
 
-
   def loadReads(pipeline: Pipeline, inputPath: String): PCollection[SAMRecordWritable] = {
     pipeline.read(From.formattedFile(
       inputPath,

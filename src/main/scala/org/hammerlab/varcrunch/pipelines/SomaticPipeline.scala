@@ -34,7 +34,6 @@ object SomaticPipeline extends VarCrunchSomaticArgs with PipelineApp {
   protected var minLikelihood: Int = 60
 
 
-
   override def run(args: Array[String]): Unit = {
     super.parseArguments(args)
 
